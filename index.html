@@ -1,0 +1,409 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Suivi des Pains</title>
+<style>
+  :root{
+    --bg:#eef2f8; --card:#ffffff; --card2:#f3f6fb; --line:#dde3ec;
+    --text:#1f2937; --muted:#6b7280; --accent:#2563eb; --green:#16a34a;
+    --red:#dc2626; --gold:#b45309;
+  }
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+  body{
+    margin:0;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;
+    background:var(--bg);color:var(--text);padding:16px;max-width:520px;margin:0 auto;
+  }
+  h1{font-size:20px;margin:4px 0 16px;text-align:center}
+  .totals{display:flex;gap:12px;margin-bottom:18px}
+  .total-box{
+    flex:1;background:var(--card);
+    border:1px solid var(--line);border-radius:18px;padding:16px;text-align:center;
+    box-shadow:0 1px 3px rgba(0,0,0,.05);
+  }
+  .total-box .label{font-size:12px;color:var(--muted);margin-bottom:6px;text-transform:uppercase;letter-spacing:.5px}
+  .total-box .value{font-size:28px;font-weight:700}
+  .total-box.money .value{color:var(--gold)}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:18px;padding:16px;margin-bottom:16px;box-shadow:0 1px 3px rgba(0,0,0,.05)}
+  .card h2{font-size:15px;margin:0 0 12px;color:var(--muted);font-weight:600}
+  .row{display:flex;gap:10px;align-items:center}
+  label.field{flex:1;min-width:0;display:flex;flex-direction:column;gap:6px;font-size:12px;color:var(--muted)}
+  input[type=date],input[type=number],input[type=text],select{
+    background:var(--card2);border:1px solid var(--line);color:var(--text);
+    border-radius:12px;padding:12px;font-size:16px;width:100%;min-width:0;max-width:100%;
+  }
+  input[type=date]{-webkit-appearance:none;appearance:none;text-align:left}
+  .dt-row{align-items:flex-start}
+  @media (max-width:480px){
+    .dt-row{flex-direction:column;align-items:stretch}
+  }
+  button{border:none;border-radius:12px;padding:13px 16px;font-size:15px;font-weight:600;cursor:pointer;color:#fff;transition:transform .05s}
+  button:active{transform:scale(.97)}
+  .btn-green{background:var(--green)}
+  .btn-blue{background:var(--accent)}
+  .btn-red{background:var(--red)}
+  .btn-ghost{background:var(--card2);color:var(--text);border:1px solid var(--line)}
+  .btn-full{width:100%;margin-top:10px}
+  .records{list-style:none;padding:0;margin:0}
+  .rec{display:flex;justify-content:space-between;align-items:center;padding:12px;border-radius:12px;background:var(--card2);border:1px solid var(--line);margin-bottom:8px}
+  .rec .info{font-size:14px}
+  .rec .info small{color:var(--muted);display:block;font-size:12px;margin-top:2px}
+  .rec .amount{text-align:right}
+  .rec .amount b{color:var(--gold)}
+  .rec .del{background:none;color:var(--red);padding:6px 8px;font-size:18px}
+  .empty{color:var(--muted);text-align:center;padding:20px;font-size:14px}
+  .divider{height:1px;background:var(--line);margin:16px 0}
+
+  /* PIN modal */
+  .overlay{position:fixed;inset:0;background:rgba(31,41,55,.45);backdrop-filter:blur(4px);display:none;align-items:center;justify-content:center;z-index:50}
+  .overlay.show{display:flex}
+  .pinbox{text-align:center;width:320px;background:var(--card);border-radius:24px;padding:28px 20px;box-shadow:0 12px 40px rgba(0,0,0,.25)}
+  .pinbox h3{font-weight:600;margin-bottom:6px;color:var(--text)}
+  .pinbox .sub{color:var(--muted);font-size:13px;margin-bottom:22px}
+  .dots{display:flex;gap:12px;justify-content:center;margin-bottom:28px}
+  .dot{width:14px;height:14px;border-radius:50%;border:2px solid var(--muted)}
+  .dot.filled{background:var(--accent);border-color:var(--accent)}
+  .dot.error{border-color:var(--red);background:var(--red)}
+  .pad{display:grid;grid-template-columns:repeat(3,1fr);gap:16px;justify-items:center}
+  .key{width:68px;height:68px;border-radius:50%;background:var(--card2);color:var(--text);font-size:28px;font-weight:400;display:flex;align-items:center;justify-content:center;cursor:pointer;border:1px solid var(--line)}
+  .key:active{background:#e2e8f0}
+  .key.fn{font-size:15px;background:none;border:none;color:var(--accent)}
+  .admin-panel{display:none}
+  .admin-panel.show{display:block}
+  .tag{display:inline-block;background:var(--accent);color:#fff;font-size:11px;padding:2px 8px;border-radius:8px;margin-left:6px;vertical-align:middle}
+</style>
+</head>
+<body>
+
+<h1>🥖 Suivi des Pains</h1>
+<div id="syncStatus" style="text-align:center;font-size:12px;color:var(--muted);margin:-8px 0 14px">⏳ ...</div>
+
+<!-- TOTAUX EN HAUT -->
+<div class="totals">
+  <div class="total-box">
+    <div class="label">Total Pains</div>
+    <div class="value" id="totalPains">0</div>
+  </div>
+  <div class="total-box money">
+    <div class="label">Montant Dû</div>
+    <div class="value" id="totalMoney">0 €</div>
+  </div>
+</div>
+
+<!-- NOUVELLE LIVRAISON -->
+<div class="card">
+  <h2>Nouvelle livraison</h2>
+  <label class="field" style="margin-bottom:12px">
+    <span style="display:flex;justify-content:space-between;align-items:center">
+      <span>Date</span>
+      <span id="dayLabel" style="color:var(--accent);font-weight:600"></span>
+    </span>
+    <input type="date" id="inDate" onchange="updateDayLabel()">
+  </label>
+  <div class="row">
+    <label class="field">Pain kebab
+      <input type="number" id="inKebab" min="0" step="1" placeholder="0" inputmode="numeric">
+    </label>
+    <label class="field">Pain burger
+      <input type="number" id="inBurger" min="0" step="1" placeholder="0" inputmode="numeric">
+    </label>
+  </div>
+  <button class="btn-green btn-full" onclick="addDelivery()">Enregistrer la livraison</button>
+</div>
+
+<!-- HISTORIQUE -->
+<div class="card">
+  <h2>Historique</h2>
+  <ul class="records" id="recordList"></ul>
+</div>
+
+<!-- ACCÈS ADMIN -->
+<button class="btn-ghost btn-full" onclick="openPin()">🔒 Panneau Admin</button>
+
+<!-- PANNEAU ADMIN -->
+<div class="card admin-panel" id="adminPanel" style="margin-top:16px">
+  <h2>Panneau Admin <span class="tag">Autorisé</span></h2>
+
+  <label class="field" style="margin-bottom:12px">Prix par pain (€)
+    <input type="number" id="priceInput" min="0" step="0.05">
+  </label>
+  <button class="btn-blue btn-full" onclick="savePrice()">Enregistrer le prix</button>
+
+  <div class="divider"></div>
+
+  <h2 style="margin-top:4px">📋 Détails des livraisons</h2>
+  <div id="adminRecords"></div>
+
+  <div class="divider"></div>
+
+  <h2 style="margin-top:4px">☁️ Synchronisation</h2>
+  <p style="font-size:12px;color:var(--muted);margin:0 0 10px;line-height:1.5">
+    Les données sont enregistrées automatiquement et partagées entre tous les appareils. Aucune configuration nécessaire.
+  </p>
+  <button class="btn-ghost btn-full" onclick="pullData()">🔄 Actualiser depuis le cloud</button>
+
+  <div class="divider"></div>
+
+  <button class="btn-red btn-full" onclick="clearAll()">⚠️ Supprimer tout</button>
+  <button class="btn-ghost btn-full" onclick="lockAdmin()">Verrouiller</button>
+</div>
+
+<!-- OVERLAY PIN -->
+<div class="overlay" id="pinOverlay">
+  <div class="pinbox">
+    <h3>Entrez le code PIN</h3>
+    <div class="sub">Pour la suppression et le prix</div>
+    <div class="dots" id="dots">
+      <div class="dot"></div><div class="dot"></div><div class="dot"></div>
+      <div class="dot"></div><div class="dot"></div><div class="dot"></div>
+    </div>
+    <div class="pad">
+      <div class="key" onclick="press('1')">1</div>
+      <div class="key" onclick="press('2')">2</div>
+      <div class="key" onclick="press('3')">3</div>
+      <div class="key" onclick="press('4')">4</div>
+      <div class="key" onclick="press('5')">5</div>
+      <div class="key" onclick="press('6')">6</div>
+      <div class="key" onclick="press('7')">7</div>
+      <div class="key" onclick="press('8')">8</div>
+      <div class="key" onclick="press('9')">9</div>
+      <div class="key fn" onclick="closePin()">Annuler</div>
+      <div class="key" onclick="press('0')">0</div>
+      <div class="key fn" onclick="backspace()">⌫</div>
+    </div>
+  </div>
+</div>
+
+<script>
+// ---- PARAMÈTRES ----
+const ADMIN_PIN = "210919";
+const LS_KEY = "suiviPainsData";
+const WORKER_URL = "https://httpssuivi-heuresw3ruslan-8c5workersdev.w3ruslan-8c5.workers.dev";
+const DATA_FILE = "pains.json";
+
+// ---- DONNÉES ----
+let data = JSON.parse(localStorage.getItem(LS_KEY) || "null") || { price:0.5, deliveries:[] };
+if(typeof data.price!=='number') data.price = 0.5;
+if(!Array.isArray(data.deliveries)) data.deliveries = [];
+
+let syncTimer = null, workerReady = true;
+
+function saveLocal(){ localStorage.setItem(LS_KEY, JSON.stringify(data)); }
+function save(){ saveLocal(); localStorage.setItem('pendingSyncPains','1'); scheduleSync(); }
+
+function setSyncStatus(t){ const e=document.getElementById('syncStatus'); if(e) e.textContent=t; }
+function isEmpty(o){ return !o.deliveries || o.deliveries.length===0; }
+function normalize(o){
+  o = o || {};
+  if(typeof o.price!=='number') o.price = 0.5;
+  if(!Array.isArray(o.deliveries)) o.deliveries = [];
+  return o;
+}
+
+// ---- SYNCHRONISATION (via Cloudflare Worker) ----
+async function pullData(){
+  setSyncStatus("⏳ Chargement...");
+  try{
+    const r = await fetch(WORKER_URL+"?file="+DATA_FILE+"&t="+Date.now(), {cache:"no-store"});
+    if(!r.ok) throw new Error("HTTP "+r.status);
+    const cloud = await r.json();
+    // Sécurité : si le Worker renvoie les données des heures (pas encore à jour)
+    if(cloud && cloud.workers!==undefined && cloud.deliveries===undefined){
+      workerReady = false;
+      setSyncStatus("⚠️ Worker Cloudflare à mettre à jour");
+      return;
+    }
+    workerReady = true;
+    const nc = normalize(cloud);
+    const pending = localStorage.getItem('pendingSyncPains')==='1';
+    if(pending){
+      await pushData(); return;
+    } else if(isEmpty(nc) && !isEmpty(data)){
+      await pushData(); return;
+    } else {
+      data = nc; saveLocal(); render();
+    }
+    setSyncStatus("☁️ Synchronisé");
+  }catch(e){ setSyncStatus("⚠️ Erreur ("+e.message+")"); }
+}
+function scheduleSync(){
+  setSyncStatus("✎ Enregistrement...");
+  clearTimeout(syncTimer);
+  syncTimer = setTimeout(pushData, 800);
+}
+async function pushData(){
+  if(!workerReady){ setSyncStatus("⚠️ Worker à mettre à jour"); return; }
+  setSyncStatus("⏳ Enregistrement...");
+  try{
+    const r = await fetch(WORKER_URL+"?file="+DATA_FILE, {method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify(data)});
+    if(!r.ok) throw new Error("HTTP "+r.status);
+    localStorage.removeItem('pendingSyncPains');
+    setSyncStatus("☁️ Synchronisé");
+  }catch(e){ setSyncStatus("⚠️ Erreur ("+e.message+")"); }
+}
+
+// ---- AIDES ----
+function todayDate(){
+  const d=new Date();
+  return d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,'0')+"-"+String(d.getDate()).padStart(2,'0');
+}
+function fmt(n){ return Number(n).toFixed(2).replace(/\.00$/,'').replace(/(\.\d)0$/,'$1'); }
+function dayName(dateStr){
+  if(!dateStr) return '';
+  const s=new Date(dateStr+"T00:00").toLocaleDateString('fr-FR',{weekday:'long'});
+  return s.charAt(0).toUpperCase()+s.slice(1);
+}
+function updateDayLabel(){
+  document.getElementById('dayLabel').textContent = dayName(document.getElementById('inDate').value);
+}
+
+// ---- NOUVELLE LIVRAISON ----
+function addDelivery(){
+  if(!workerReady){ alert("La synchronisation n'est pas prête. Mettez d'abord à jour le Worker Cloudflare."); return; }
+  const date = document.getElementById('inDate').value || todayDate();
+  const kebab = parseInt(document.getElementById('inKebab').value) || 0;
+  const burger = parseInt(document.getElementById('inBurger').value) || 0;
+  if(kebab<=0 && burger<=0){ alert("Entrez au moins un pain."); return; }
+  data.deliveries.unshift({ id:"d"+Date.now(), date, kebab, burger });
+  document.getElementById('inKebab').value = "";
+  document.getElementById('inBurger').value = "";
+  save(); render();
+}
+
+// ---- AFFICHAGE ----
+function render(){
+  const totalKebab = data.deliveries.reduce((s,d)=>s+d.kebab,0);
+  const totalBurger = data.deliveries.reduce((s,d)=>s+d.burger,0);
+  const totalPains = totalKebab + totalBurger;
+  document.getElementById('totalPains').textContent = totalPains;
+  document.getElementById('totalMoney').textContent = fmt(totalPains*data.price)+" €";
+
+  document.getElementById('inDate').value = todayDate();
+  updateDayLabel();
+
+  const list = document.getElementById('recordList');
+  if(data.deliveries.length===0){
+    list.innerHTML = '<div class="empty">Aucune livraison.</div>';
+  } else {
+    list.innerHTML = data.deliveries.map(d=>{
+      const tot = d.kebab + d.burger;
+      return `<li class="rec">
+        <div class="info">${dayName(d.date)} ${d.date}<small>${d.kebab} kebab + ${d.burger} burger · ${tot} pains</small></div>
+        <div class="amount"><b>${fmt(tot*data.price)} €</b></div>
+      </li>`;
+    }).join('');
+  }
+
+  document.getElementById('priceInput').value = data.price;
+  renderAdminRecords();
+}
+
+function renderAdminRecords(){
+  const el = document.getElementById('adminRecords');
+  if(!el) return;
+  if(data.deliveries.length===0){
+    el.innerHTML = '<div class="empty" style="padding:8px">Aucune livraison.</div>';
+    return;
+  }
+  el.innerHTML = data.deliveries.map((d,idx)=>{
+    const tot = d.kebab + d.burger;
+    if(idx===editingIndex){
+      return `<div class="rec" style="flex-direction:column;align-items:stretch;gap:8px;border:1px solid var(--accent)">
+        <label class="field"><span>Date</span><input type="date" id="editDate" value="${d.date}"></label>
+        <div class="row">
+          <label class="field">Pain kebab<input type="number" id="editKebab" min="0" step="1" value="${d.kebab}"></label>
+          <label class="field">Pain burger<input type="number" id="editBurger" min="0" step="1" value="${d.burger}"></label>
+        </div>
+        <div class="row">
+          <button class="btn-green" style="flex:1" onclick="saveEdit(${idx})">Enregistrer</button>
+          <button class="btn-ghost" style="flex:1" onclick="cancelEdit()">Annuler</button>
+        </div>
+      </div>`;
+    }
+    return `<div class="rec">
+      <div class="info">${dayName(d.date)} ${d.date}<small>${d.kebab} kebab + ${d.burger} burger · ${tot} pains · ${fmt(tot*data.price)} €</small></div>
+      <button class="del" onclick="askEdit(${idx})" style="color:var(--accent)">✏️</button>
+      <button class="del" onclick="askDelete(${idx})">🗑️</button>
+    </div>`;
+  }).join('');
+}
+
+// ---- ADMIN ----
+function savePrice(){
+  const v = parseFloat(document.getElementById('priceInput').value);
+  if(isNaN(v)||v<0){ alert("Entrez un prix valide."); return; }
+  data.price = v; save(); render(); alert("Prix enregistré : "+v+" € / pain");
+}
+function lockAdmin(){ document.getElementById('adminPanel').classList.remove('show'); }
+
+// ---- SUPPRESSION / MODIFICATION (avec PIN) ----
+function askDelete(i){ openPin({type:'delete', index:i}); }
+function clearAll(){ openPin({type:'clearAll'}); }
+
+let editingIndex = null;
+function askEdit(i){ openPin({type:'edit', index:i}); }
+function cancelEdit(){ editingIndex = null; render(); }
+function saveEdit(idx){
+  const date = document.getElementById('editDate').value;
+  const kebab = parseInt(document.getElementById('editKebab').value) || 0;
+  const burger = parseInt(document.getElementById('editBurger').value) || 0;
+  if(!date){ alert("Choisissez une date."); return; }
+  if(kebab<=0 && burger<=0){ alert("Entrez au moins un pain."); return; }
+  data.deliveries[idx] = { ...data.deliveries[idx], date, kebab, burger };
+  editingIndex = null;
+  save(); render();
+}
+
+// ---- PIN ----
+let pinEntry="", pinAction=null;
+function openPin(action){
+  pinAction = action || {type:'admin'};
+  pinEntry=""; updateDots();
+  document.getElementById('pinOverlay').classList.add('show');
+}
+function closePin(){
+  document.getElementById('pinOverlay').classList.remove('show');
+  pinEntry=""; pinAction=null;
+}
+function press(n){
+  if(pinEntry.length>=6) return;
+  pinEntry+=n; updateDots();
+  if(pinEntry.length===6) setTimeout(checkPin,150);
+}
+function backspace(){ pinEntry=pinEntry.slice(0,-1); updateDots(); }
+function updateDots(){
+  document.querySelectorAll('#dots .dot').forEach((d,i)=>{
+    d.className="dot"+(i<pinEntry.length?" filled":"");
+  });
+}
+function checkPin(){
+  if(pinEntry===ADMIN_PIN){
+    document.getElementById('pinOverlay').classList.remove('show');
+    const a = pinAction || {type:'admin'};
+    if(a.type==='delete'){
+      data.deliveries.splice(a.index,1); save(); render();
+    } else if(a.type==='clearAll'){
+      data.deliveries=[]; save(); render();
+    } else if(a.type==='edit'){
+      editingIndex = a.index; render();
+    } else {
+      document.getElementById('adminPanel').classList.add('show');
+    }
+    pinEntry=""; pinAction=null;
+  } else {
+    document.querySelectorAll('#dots .dot').forEach(d=>d.className="dot error");
+    setTimeout(()=>{ pinEntry=""; updateDots(); },400);
+  }
+}
+
+// ---- DÉMARRAGE ----
+document.getElementById('inDate').value = todayDate();
+updateDayLabel();
+render();
+pullData();
+
+document.addEventListener('visibilitychange', ()=>{ if(!document.hidden) pullData(); });
+</script>
+</body>
+</html>
